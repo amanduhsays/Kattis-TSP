@@ -4,6 +4,7 @@
 #include <iomanip>
 
 using namespace std;
+
 int N;
 float loc[1000][2];
 int dist[1000][1000];
@@ -29,29 +30,25 @@ void computeDistMatrix() {
     }
 }
 
-int main () {
-    scanf("%d", &N);
-    
-    // Get input
-    for (int i = 0; i < N; i++) {
-        float x, y;
-        scanf("%f %f", &x, &y);
-        loc[i][0] = x;
-        loc[i][1] = y;
+int computeTourLength(vector<int> tour) {
+    int totalDistance = 0;
+    for (int i = 0; i < N - 1; i++) {
+        totalDistance += dist[tour[i]][tour[i+1]];
     }
+    totalDistance += dist[tour[N-1]][tour[0]];
     
-    computeDistMatrix();
-    
-    // Greedy Part Init
+    return totalDistance;
+}
+
+vector<int> greedyTour() {
     int best;
     int curr;
-    int tour[N];
+    vector<int> tour(N);
     bool used[N];
     for (int i = 0; i < N; i++) {
         used[i] = false;
     }
-    
-    // Greedy Part
+
     tour[0] = 0;
     used[0] = true;
     curr = 0;
@@ -66,6 +63,56 @@ int main () {
         used[best] = true;
         curr = best;
     }
+    
+    return tour;
+}
+
+vector<int> twoOptSwap(vector<int> tour, int i, int k) {
+    vector<int> newTour;
+    newTour.insert(newTour.end(), tour.begin(), tour.begin() + i);
+    newTour.insert(newTour.end(), tour.rbegin() + (N - 1 - k), tour.rbegin() + (N - i));
+    newTour.insert(newTour.end(), tour.begin() + (k + 1), tour.end());
+    return newTour;
+}
+
+vector<int> twoOpt(vector<int> tour) {
+    bool hasImprovement = true;
+    while (hasImprovement) {
+        hasImprovement = false;
+        int bestDistance = computeTourLength(tour);
+        for (int i = 0; i < N; i++) {
+            for (int k = i + 1; k < N; k++) {
+                vector<int> newTour = twoOptSwap(tour, i, k);
+                int newDistance = computeTourLength(newTour);
+                if (newDistance < bestDistance) {
+                    tour = newTour;
+                    hasImprovement = true;
+                }
+            }
+        }
+        
+    }
+    return tour;
+}
+
+int main () {
+    scanf("%d", &N);
+    
+    // Get input
+    for (int i = 0; i < N; i++) {
+        float x, y;
+        scanf("%f %f", &x, &y);
+        loc[i][0] = x;
+        loc[i][1] = y;
+    }
+    
+    computeDistMatrix();
+    
+    vector<int> tour;
+    tour = greedyTour();
+    tour = twoOpt(tour);
+    
+    printf("Tour length = %d\n", computeTourLength(tour));
     
     // Print Answer
     for (int i = 0; i < N ; i++) {

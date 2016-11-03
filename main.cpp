@@ -1,6 +1,7 @@
 #include <iostream>
 #include <vector>
 #include <cmath>
+#include <chrono>
 #include <iomanip>
 
 using namespace std;
@@ -8,6 +9,11 @@ using namespace std;
 int N;
 float loc[1000][2];
 int dist[1000][1000];
+
+// Return the current time.
+static inline chrono::time_point<chrono::high_resolution_clock> now() {
+    return chrono::high_resolution_clock::now();
+}
 
 void printDistMatrix() {
     for (int i = 0; i < N; i++) {
@@ -75,22 +81,22 @@ vector<int> twoOptSwap(vector<int> tour, int i, int k) {
     return newTour;
 }
 
-vector<int> twoOpt(vector<int> tour) {
+vector<int> twoOpt(vector<int> tour, chrono::time_point<chrono::high_resolution_clock> &deadline) {
     bool hasImprovement = true;
-    while (hasImprovement) {
+    int bestDistance = computeTourLength(tour);
+    while (hasImprovement && chrono::high_resolution_clock::now() < deadline) {
         hasImprovement = false;
-        int bestDistance = computeTourLength(tour);
         for (int i = 0; i < N; i++) {
             for (int k = i + 1; k < N; k++) {
                 vector<int> newTour = twoOptSwap(tour, i, k);
                 int newDistance = computeTourLength(newTour);
                 if (newDistance < bestDistance) {
                     tour = newTour;
+                    bestDistance = newDistance;
                     hasImprovement = true;
                 }
             }
         }
-        
     }
     return tour;
 }
@@ -110,9 +116,14 @@ int main () {
     
     vector<int> tour;
     tour = greedyTour();
-    tour = twoOpt(tour);
     
-    printf("Tour length = %d\n", computeTourLength(tour));
+    //auto start = now();
+    auto twoOptLimit = now() + chrono::milliseconds(50);
+    tour = twoOpt(tour, twoOptLimit);
+    
+    //chrono::milliseconds totalTime = chrono::duration_cast<chrono::milliseconds>(now() - start);
+    //cout << "Total time = " << totalTime.count() << "\n";
+    //printf("Tour length = %d\n", computeTourLength(tour));
     
     // Print Answer
     for (int i = 0; i < N ; i++) {

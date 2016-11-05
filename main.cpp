@@ -3,6 +3,7 @@
 #include <cmath>
 #include <chrono>
 #include <iomanip>
+#include <algorithm>
 
 using namespace std;
 
@@ -54,6 +55,19 @@ int computeTourLength(vector<int> tour) {
     totalDistance += dist[tour[N-1]][tour[0]];
     
     return totalDistance;
+}
+
+/*
+ Generate random tour for random re-tours
+*/
+vector<int> randomTour() {
+    vector<int> tour;
+    for (int i = 0; i < N; i++) {
+        tour.push_back(i);
+    }
+    random_shuffle (tour.begin(), tour.end());
+
+    return tour;
 }
 
 /*
@@ -134,6 +148,44 @@ vector<int> twoOpt(vector<int> tour, chrono::time_point<chrono::high_resolution_
     return tour;
 }
 
+/*
+ Given 2 sets of sub-tour costs a~b~c and d~e [c & d not neccessarily linked]
+ Check if a new tour cost of a~c + d~b~e is better than the previous tour cost
+ a.k.a Just placing b in-between d & e is to see if it's better than placing b in-between a & c
+*/
+vector<int> twoHalfOpt(vector<int> tour, chrono::time_point<chrono::high_resolution_clock> &deadline) {
+    bool hasImprovement = true;
+    while (hasImprovement && chrono::high_resolution_clock::now() < deadline) {
+        hasImprovement = false;
+        for (int  i = 0; i < N - 2; i++) {
+            for (int j = i + 3; j < N - 1; j++) {
+        
+                int a = tour[i];
+                int b = tour[i+1];
+                int c = tour[i+2];
+                int d = tour[j];
+                int e = tour[j+1];
+                
+                int prevSubDistance = dist[a][b] + dist[b][c] + dist[d][e];
+                int newSubDistance = dist[a][c] + dist[d][b] + dist[b][e];
+                
+                vector<int> newTour;
+                if (newSubDistance < prevSubDistance) {
+                    newTour.insert(newTour.end(), tour.begin(), tour.begin() + (i+1));
+                    newTour.insert(newTour.end(), tour.begin() + (i+2), tour.begin() + (j+1));
+                    newTour.insert(newTour.end(), tour[i+1]);
+                    newTour.insert(newTour.end(), tour.begin() + (j+1), tour.end());
+
+                    tour = newTour;
+                    hasImprovement = true;
+                }
+            }
+        }
+    }
+    
+    return tour;
+}
+
 /* 
  2 possibilities for 3 OPT
  Given 0 1 2 3 4 5 6 7 8 with i = 3 and j = 6:
@@ -200,13 +252,16 @@ int main () {
     auto twoOptLimit = now() + chrono::milliseconds(50);
     tour = twoOpt(tour, twoOptLimit);
     
+    auto twoHalfOptLimit = now() + chrono::milliseconds(50);
+    tour = twoHalfOpt(tour, twoHalfOptLimit);
+    
     auto threeOptLimit = now() + chrono::milliseconds(50);
     tour = threeOpt(tour, threeOptLimit);
     
     //chrono::milliseconds totalTime = chrono::duration_cast<chrono::milliseconds>(now() - start);
     //cout << "Total time = " << totalTime.count() << "\n";
     //printf("Tour length = %d\n", computeTourLength(tour));
-    
+
     // Print Answer
     for (int i = 0; i < N ; i++) {
         printf("%d\n", tour[i]);

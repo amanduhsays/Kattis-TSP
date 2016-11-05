@@ -115,18 +115,9 @@ vector<int> twoOpt(vector<int> tour, chrono::time_point<chrono::high_resolution_
     while (hasImprovement && chrono::high_resolution_clock::now() < deadline) {
         hasImprovement = false;
         for (int i = 0; i < N; i++) {
-            for (int k = i + 1; k < N; k++) {
-                
-                int iB = i - 1;
-                int kA = k + 1;
-                
-                if (i == 0) {
-                    iB = N-1;
-                }
-                
-                if (k == N - 1) {
-                    kA = 0;
-                }
+            for (int k = i + 1; k < N - 1; k++) {
+                int iB = (i == 0)? N - 1 : i - 1;
+                int kA = (k == N - 1)? 0 : k + 1;
                 
                 int removedEdges = bestDistance - dist[tour[i]][tour[iB]] - dist[tour[k]][tour[kA]];
                 int newDistance = removedEdges + dist[tour[iB]][tour[k]] + dist[tour[i]][tour[kA]];
@@ -135,6 +126,7 @@ vector<int> twoOpt(vector<int> tour, chrono::time_point<chrono::high_resolution_
                     tour = twoOptSwap(tour, i, k);
                     bestDistance = newDistance;
                     hasImprovement = true;
+                    //cout << computeTourLength(tour) << " " << bestDistance << endl;
                 }
             }
         }

@@ -242,29 +242,41 @@ int main () {
         loc[i][1] = y;
     }
     
+    auto start = now();
+    
     computeDistMatrix();
+    vector<int> tour = greedyTour();
+    vector<int> shortestTour = tour;
+    int shortestDistance = computeTourLength(tour);
     
-    vector<int> tour;
-    tour = greedyTour();
-    
-    //auto start = now();
-    
-    auto twoOptLimit = now() + chrono::milliseconds(50);
-    tour = twoOpt(tour, twoOptLimit);
-    
-    auto twoHalfOptLimit = now() + chrono::milliseconds(50);
-    tour = twoHalfOpt(tour, twoHalfOptLimit);
-    
-    auto threeOptLimit = now() + chrono::milliseconds(50);
-    tour = threeOpt(tour, threeOptLimit);
+    chrono::milliseconds currTime = chrono::duration_cast<chrono::milliseconds>(now() - start);
+    while (currTime.count() <= 1950) {
+        tour = randomTour();
+        
+        auto twoOptLimit = now() + chrono::milliseconds(50);
+        tour = twoOpt(tour, twoOptLimit);
+        
+        auto twoHalfOptLimit = now() + chrono::milliseconds(50);
+        tour = twoHalfOpt(tour, twoHalfOptLimit);
+        
+        auto threeOptLimit = now() + chrono::milliseconds(50);
+        tour = threeOpt(tour, threeOptLimit);
+        currTime = chrono::duration_cast<chrono::milliseconds>(now() - start);
+        
+        int currLength = computeTourLength(tour);
+        if (currLength < shortestDistance) {
+            shortestTour = tour;
+            shortestDistance = currLength;
+        }
+    }
     
     //chrono::milliseconds totalTime = chrono::duration_cast<chrono::milliseconds>(now() - start);
     //cout << "Total time = " << totalTime.count() << "\n";
-    //printf("Tour length = %d\n", computeTourLength(tour));
+    //printf("Tour length = %d\n", computeTourLength(shortestTour));
 
     // Print Answer
     for (int i = 0; i < N ; i++) {
-        printf("%d\n", tour[i]);
+        printf("%d\n", shortestTour[i]);
     }
     
     return 0;

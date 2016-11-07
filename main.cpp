@@ -4,12 +4,15 @@
 #include <chrono>
 #include <iomanip>
 #include <algorithm>
+#include <cstring>
 
 using namespace std;
 
 int N;
+float aspValue;
 float loc[1000][2];
 int dist[1000][1000];
+int tabuList[1000][1000];
 
 // Return the current time.
 static inline chrono::time_point<chrono::high_resolution_clock> now() {
@@ -44,9 +47,26 @@ void computeDistMatrix() {
     }
 }
 
+void decrementTabu() {
+    int k;
+    if (N % 2 == 0) {
+        k = N / 2;
+    } else {
+        k = N / 2 + 1;
+    }
+    
+    for (int i = 0; i < k; i++) {
+        for (int j = 0; j < k; j++) {
+            if (tabuList[i][j] > 0) {
+                tabuList[i][j] = tabuList[j][i] = tabuList[i][j] - 1;
+            }
+        }
+    }
+}
+
 /*
  Calculates tour from tour[0] to tour[N-1] and back to tour[0]
-*/
+ */
 int computeTourLength(vector<int> tour) {
     int totalDistance = 0;
     for (int i = 0; i < N - 1; i++) {
@@ -59,20 +79,20 @@ int computeTourLength(vector<int> tour) {
 
 /*
  Generate random tour for random re-tours
-*/
+ */
 vector<int> randomTour() {
     vector<int> tour;
     for (int i = 0; i < N; i++) {
         tour.push_back(i);
     }
     random_shuffle (tour.begin(), tour.end());
-
+    
     return tour;
 }
 
 /*
  Algorithm taken from Kattis TSP brief
-*/
+ */
 vector<int> greedyTour() {
     int best;
     int curr;
@@ -81,7 +101,7 @@ vector<int> greedyTour() {
     for (int i = 0; i < N; i++) {
         used[i] = false;
     }
-
+    
     tour[0] = 0;
     used[0] = true;
     curr = 0;
@@ -122,10 +142,15 @@ vector<int> twoOptSwap(vector<int> tour, int i, int k) {
 
 /*
  Simply reverse the tour in-between i and k (i & k inclusive)
-*/
-vector<int> twoOpt(vector<int> tour, chrono::time_point<chrono::high_resolution_clock> &deadline) {
+ */
+vector<int> twoOpt(vector<int> tour, int twoOptTabuTenure, chrono::time_point<chrono::high_resolution_clock> &deadline) {
+    
+    memset(tabuList, 0, sizeof tabuList);
+    vector<int> localOpt = tour;
+    int localOptDist = computeTourLength(tour);
+    
     bool hasImprovement = true;
-    int bestDistance = computeTourLength(tour);
+    int bestDistance = localOptDist;
     while (hasImprovement && chrono::high_resolution_clock::now() < deadline) {
         hasImprovement = false;
         for (int i = 0; i < N; i++) {
@@ -136,15 +161,26 @@ vector<int> twoOpt(vector<int> tour, chrono::time_point<chrono::high_resolution_
                 int removedEdges = bestDistance - dist[tour[i]][tour[iB]] - dist[tour[k]][tour[kA]];
                 int newDistance = removedEdges + dist[tour[iB]][tour[k]] + dist[tour[i]][tour[kA]];
                 
-                if (newDistance < bestDistance) {
+                if ( (newDistance < bestDistance && tabuList[i][k] == 0) || ( float(newDistance * aspValue) < bestDistance) ) {
                     tour = twoOptSwap(tour, i, k);
                     bestDistance = newDistance;
                     hasImprovement = true;
-                    //cout << computeTourLength(tour) << " " << bestDistance << endl;
+                    
+                    tabuList[i][k] = twoOptTabuTenure;
                 }
             }
         }
+        
+        decrementTabu();
+        
+        if (bestDistance < localOptDist) {
+            localOpt = tour;
+            localOptDist = bestDistance;
+        }
     }
+    
+    tour = localOpt;
+    
     return tour;
 }
 
@@ -152,14 +188,14 @@ vector<int> twoOpt(vector<int> tour, chrono::time_point<chrono::high_resolution_
  Given 2 sets of sub-tour costs a~b~c and d~e [c & d not neccessarily linked]
  Check if a new tour cost of a~c + d~b~e is better than the previous tour cost
  a.k.a Just placing b in-between d & e is to see if it's better than placing b in-between a & c
-*/
+ */
 vector<int> twoHalfOpt(vector<int> tour, chrono::time_point<chrono::high_resolution_clock> &deadline) {
     bool hasImprovement = true;
     while (hasImprovement && chrono::high_resolution_clock::now() < deadline) {
         hasImprovement = false;
         for (int  i = 0; i < N - 2; i++) {
             for (int j = i + 3; j < N - 1; j++) {
-        
+                
                 int a = tour[i];
                 int b = tour[i+1];
                 int c = tour[i+2];
@@ -175,7 +211,7 @@ vector<int> twoHalfOpt(vector<int> tour, chrono::time_point<chrono::high_resolut
                     newTour.insert(newTour.end(), tour.begin() + (i+2), tour.begin() + (j+1));
                     newTour.insert(newTour.end(), tour[i+1]);
                     newTour.insert(newTour.end(), tour.begin() + (j+1), tour.end());
-
+                    
                     tour = newTour;
                     hasImprovement = true;
                 }
@@ -186,15 +222,20 @@ vector<int> twoHalfOpt(vector<int> tour, chrono::time_point<chrono::high_resolut
     return tour;
 }
 
-/* 
+/*
  2 possibilities for 3 OPT
  Given 0 1 2 3 4 5 6 7 8 with i = 3 and j = 6:
  - 1st permutation = 0 1 2 6 7 8 3 4 5
  - 2nd permutation = 0 1 2 5 4 3 8 7 6
-*/
-vector<int> threeOpt(vector<int> tour, chrono::time_point<chrono::high_resolution_clock> &deadline) {
+ */
+vector<int> threeOpt(vector<int> tour, int threeOptTabuTenure, chrono::time_point<chrono::high_resolution_clock> &deadline) {
+    
+    memset(tabuList, 0, sizeof tabuList);
+    vector<int> localOpt = tour;
+    int localOptDist = computeTourLength(tour);
+    
     bool hasImprovement = true;
-    int bestDistance = computeTourLength(tour);
+    int bestDistance = localOptDist;
     while (hasImprovement && chrono::high_resolution_clock::now() < deadline) {
         hasImprovement = false;
         for (int i = 1; i < N; i++) {
@@ -204,7 +245,7 @@ vector<int> threeOpt(vector<int> tour, chrono::time_point<chrono::high_resolutio
                 int tour1Dist = removedEdges + dist[tour[i-1]][tour[j]] + dist[tour[N-1]][tour[i]] + dist[tour[j-1]][tour[0]];
                 int tour2Dist = removedEdges + dist[tour[i-1]][tour[j-1]] + dist[tour[N-1]][tour[i]] + dist[tour[j]][tour[0]];
                 
-                if (tour1Dist < tour2Dist && tour1Dist < bestDistance) {
+                if ( (tour1Dist < tour2Dist && tour1Dist < bestDistance && tabuList[i][j] == 0) || ( float(tour1Dist * aspValue) < bestDistance) ) {
                     vector<int> newTour1;
                     newTour1.insert(newTour1.end(), tour.begin(), tour.begin() + i);
                     newTour1.insert(newTour1.end(), tour.begin() + j, tour.end());
@@ -213,9 +254,11 @@ vector<int> threeOpt(vector<int> tour, chrono::time_point<chrono::high_resolutio
                     bestDistance = tour1Dist;
                     tour = newTour1;
                     hasImprovement = true;
+                    
+                    tabuList[i][j] = threeOptTabuTenure;
                 }
                 
-                else if (tour2Dist < tour1Dist && tour2Dist < bestDistance) {
+                else if ((tour2Dist < tour1Dist && tour2Dist < bestDistance && tabuList[i][j] == 0) || ( float(tour2Dist * aspValue) < bestDistance) ) {
                     vector<int> newTour2;
                     newTour2.insert(newTour2.end(), tour.begin(), tour.begin() + i);
                     newTour2.insert(newTour2.end(), tour.rbegin() + (N - j), tour.rbegin() + (N - i));
@@ -224,10 +267,22 @@ vector<int> threeOpt(vector<int> tour, chrono::time_point<chrono::high_resolutio
                     bestDistance = tour2Dist;
                     tour = newTour2;
                     hasImprovement = true;
+                    
+                    tabuList[i][j] = threeOptTabuTenure;
                 }
             }
         }
+        
+        decrementTabu();
+        
+        if (bestDistance < localOptDist) {
+            localOpt = tour;
+            localOptDist = bestDistance;
+        }
     }
+    
+    tour = localOpt;
+    
     return tour;
 }
 
@@ -249,18 +304,28 @@ int main () {
     vector<int> shortestTour = tour;
     int shortestDistance = computeTourLength(tour);
     
+    aspValue = 2.5;
+    
     chrono::milliseconds currTime = chrono::duration_cast<chrono::milliseconds>(now() - start);
-    while (currTime.count() <= 1950) {
+    while (currTime.count() <= 1920) {
         tour = randomTour();
         
-        auto twoOptLimit = now() + chrono::milliseconds(50);
-        tour = twoOpt(tour, twoOptLimit);
+        // TWO OPT
+        auto twoOptLimit = now() + chrono::milliseconds(25);
+        int twoOptTabuTenure = 10; //round(sqrt(N));
         
-        auto twoHalfOptLimit = now() + chrono::milliseconds(50);
+        tour = twoOpt(tour, twoOptTabuTenure, twoOptLimit);
+        
+        // TWO HALF OPT
+        auto twoHalfOptLimit = now() + chrono::milliseconds(25);
         tour = twoHalfOpt(tour, twoHalfOptLimit);
         
+        // THREE OPT
         auto threeOptLimit = now() + chrono::milliseconds(50);
-        tour = threeOpt(tour, threeOptLimit);
+        int threeOptTabuTenure = 10; //round(sqrt(N));
+        
+        tour = threeOpt(tour, threeOptTabuTenure, threeOptLimit);
+        
         currTime = chrono::duration_cast<chrono::milliseconds>(now() - start);
         
         int currLength = computeTourLength(tour);
@@ -273,7 +338,7 @@ int main () {
     //chrono::milliseconds totalTime = chrono::duration_cast<chrono::milliseconds>(now() - start);
     //cout << "Total time = " << totalTime.count() << "\n";
     //printf("Tour length = %d\n", computeTourLength(shortestTour));
-
+    
     // Print Answer
     for (int i = 0; i < N ; i++) {
         printf("%d\n", shortestTour[i]);

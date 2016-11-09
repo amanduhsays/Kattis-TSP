@@ -98,6 +98,28 @@ vector<int> randomTour() {
 }
 
 /*
+ Randomly swaps two city positions in a tour
+ */
+vector<int> randomTourSwap(vector<int> tour) {
+    int first = rand() % N;
+    int second = rand() % N;
+    
+    if (second == first) {
+        if (first < N - 1) {
+            second = first + 1;
+        } else if (first > 0){
+            second = first - 1;
+        }
+    }
+    
+    int temp = tour[first];
+    tour[first] = tour[second];
+    tour[second] = temp;
+    
+    return tour;
+}
+
+/*
  Algorithm taken from Kattis TSP brief
  */
 vector<int> greedyTour() {
@@ -170,7 +192,7 @@ vector<int> twoOptSwap(vector<int> tour, int i, int k) {
 /*
  Simply reverse the tour in-between i and k (i & k inclusive)
  */
-vector<int> twoOpt(vector<int> tour, int tabuTenure, chrono::time_point<chrono::high_resolution_clock> &deadline) {
+vector<int> twoOpt(vector<int> tour, int aspRatio, int tabuTenure, chrono::time_point<chrono::high_resolution_clock> &deadline) {
     memset(tabuList, 0, sizeof tabuList);
     
     int originalTourDist, localOptDist, bestDistance;
@@ -196,7 +218,7 @@ vector<int> twoOpt(vector<int> tour, int tabuTenure, chrono::time_point<chrono::
                     int removedEdges = bestDistance - dist[tour[i]][tour[iB]] - dist[tour[k]][tour[kA]];
                     int newDistance = removedEdges + dist[tour[iB]][tour[k]] + dist[tour[i]][tour[kA]];
                     
-                    if (newDistance < bestDistance && tabuList[i][k] == 0) {
+                    if ((newDistance < bestDistance && tabuList[i][k] == 0) || (newDistance * aspRatio < bestDistance)) {
                         tour = twoOptSwap(tour, i, k);
                         bestDistance = newDistance;
                         isLocalOpt = false;
@@ -313,7 +335,7 @@ int main () {
         loc[i][0] = x;
         loc[i][1] = y;
     }
-
+    
     auto start = now();
     
     computeDistMatrix();
@@ -322,21 +344,22 @@ int main () {
     int shortestDistance = computeTourLength(tour);
     
     chrono::milliseconds currTime = chrono::duration_cast<chrono::milliseconds>(now() - start);
-    while (currTime.count() <= 1920) {
+    while (currTime.count() <= 1925) {
         
         if (N < 8) {
-            tour = greedyTour();
+            tour = randomTourSwap(tour);
         } else {
             tour = fourOpt(tour);
         }
         
         // TWO OPT
         auto twoOptLimit = now() + chrono::milliseconds(50);
-        int twoOptTabuTenure = 20; //round(sqrt(N));
-        tour = twoOpt(tour, twoOptTabuTenure, twoOptLimit);
+        int twoOptTabuTenure = 20;
+        int twoOptAspRatio = 15;
+        tour = twoOpt(tour, twoOptAspRatio, twoOptTabuTenure, twoOptLimit);
         
         // TWO HALF OPT
-        auto twoHalfOptLimit = now() + chrono::milliseconds(25);
+        auto twoHalfOptLimit = now() + chrono::milliseconds(20);
         tour = twoHalfOpt(tour, twoHalfOptLimit);
         
         // THREE OPT
